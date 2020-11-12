@@ -9,6 +9,7 @@ import {
   Save, SaveOutlined, Pageview, PageviewOutlined, DeleteSweepOutlined, CancelOutlined,
 } from '@material-ui/icons';
 import { BlockEditable } from 'markdown-translatable';
+import { CompositionDemo } from 'usfm-editor';
 
 const useStyles = makeStyles(theme => ({
   actions: {
@@ -39,6 +40,18 @@ function FileCard({
 
   const branch = (file && file.branch) ? file.branch : repository.default_branch;
 
+  const isUSFM = /\.usfm$/.test(file.path);
+  const editor = isUSFM ? (
+    <CompositionDemo usfmString={file.content}/>
+  ) : (
+    <BlockEditable
+      preview={preview}
+      markdown={markdown}
+      onEdit={setMarkdown}
+      editable={!!authentication}
+    />
+  );
+
   return (
     <Card>
       <CardHeader
@@ -48,12 +61,7 @@ function FileCard({
       />
       <CardContent>
         <Paper>
-          <BlockEditable
-            preview={preview}
-            markdown={markdown}
-            onEdit={setMarkdown}
-            editable={!!authentication}
-          />
+          {editor}
         </Paper>
       </CardContent>
       <CardActions>
