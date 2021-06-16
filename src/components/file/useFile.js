@@ -21,6 +21,8 @@ function useFile({
   config: _config,
   create=false,
   onOpenValidation,
+  onLoadCache,
+  onSaveCache,
 }) {
   const [file, setFile] = useState();
   const [blob, setBlob] = useState();
@@ -54,14 +56,75 @@ function useFile({
       const _file = await ensureFile({
         filepath, defaultContent, authentication, config, repository, branch, onOpenValidation,
       });
+
+      console.log("ensureFile:");
+      console.log(_file);
+
+      let defaultCachedContentFile;
+      // if (loadDefaultCachedContentFile) { 
+      //   console.log("_file.html_url");
+      //   console.log(_file.html_url);
+      //   defaultCachedContentFile = await loadDefaultCachedContentFile(_file.html_url);
+      // }
+      console.log("GRT // onLoadCache!", _file, _file.html_url);
+      if (onLoadCache && _file && _file.html_url)
+      {
+        defaultCachedContentFile = await onLoadCache({authentication, repository, branch, html_url: _file.html_url});
+      }
+      
+      console.log("GRT defaultContent", '|', defaultContent);
+      console.log("GRT defaultCachedContent", '|', defaultCachedContentFile);
+
+      if (defaultCachedContentFile)
+      {
+        console.log(defaultCachedContentFile.sha);
+      }
+      if (_file) {
+        console.log(_file.sha);
+      }
+
       // let content;
       // content = await repositoryActions.fileFromZip(filepath);
-      const content = await getContentFromFile(_file);
+
+      //const content = await getContentFromFile(_file);
+
+      // Allow app to provide CACHED ("offline" content);
+      // Might be different BRANCH (different user) or different FILE.
+      // Might be STALE (sha has changed on DCS).
+      // (NOTE: STALE cache would mean THIS user edited the same file in another browser.)
+      let content;
+      if (defaultCachedContentFile 
+          && defaultCachedContentFile.content 
+          && defaultCachedContentFile.sha 
+          && defaultCachedContentFile.html_url 
+          && defaultCachedContentFile.filepath 
+          && defaultCachedContentFile.timestamp 
+          && defaultCachedContentFile.sha == _file.sha
+          && defaultCachedContentFile.html_url == _file.html_url
+      ) {
+        content = defaultCachedContentFile.content;
+      } else {
+        if (_file && _file.content 
+            && defaultCachedContentFile && defaultCachedContentFile.content 
+            && defaultCachedContentFile.filepath && defaultCachedContentFile.sha
+            && defaultCachedContentFile.timestamp) {
+          console.log("alert");
+          console.log(_file);
+          console.log(defaultCachedContentFile);
+          alert(
+            "A previous file was autosaved. The autosaved file will be overwritten.\n\n" +
+            "File: " + defaultCachedContentFile.filepath + ".\n" +
+            "Edited: " + defaultCachedContentFile.timestamp.toLocaleString() + "."
+          );
+        }
+        content = await getContentFromFile(_file);
+      }
+
       update({
         ..._file, branch, content, filepath: _file.path,
       });
     }
-  }, [authentication, branch, config, defaultContent, filepath, repository, update]);
+  }, [authentication, branch, config, defaultContent, onLoadCache, filepath, repository, update]);
 
   const createFile = useCallback(async ({
     branch: _branch, filepath: _filepath, defaultContent: _defaultContent, onOpenValidation,
@@ -94,11 +157,27 @@ function useFile({
   }, [update, blobActions, onFilepath]);
 
   const save = useCallback(async (content) => {
+    console.log("GRT save // will save file");
     await saveFile({
       authentication, repository, branch, file, content,
-    });
-    await load();
-  }, [writeable, authentication, repository, branch, file, load]);
+    }).then(
+      // Empty cache if user has saved this file
+      // (save() will not happen for "OFFLINE" system files)
+      async() => {
+        console.log("GRT save // will EMPTY cache");
+        await saveCache(null); 
+        
+        console.log("GRT save // will load file");
+        await load();
+      }
+    );
+  }, [writeable, authentication, repository, branch, file, load, saveFile, saveCache]);
+
+  const saveCache = useCallback(async (content) => {
+    if (onSaveCache) {
+      await onSaveCache({authentication, repository, branch, file, content});
+    }
+  }, [writeable, authentication, repository, branch, file, onSaveCache]);
 
   const dangerouslyDelete = useCallback(async () => {
     if (writeable) {
@@ -145,6 +224,9 @@ function useFile({
     load,
     read,
     save,
+    saveCache,
+    onSaveCache,
+    onLoadCache,
     close,
     dangerouslyDelete,
   };

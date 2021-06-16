@@ -12,7 +12,6 @@ module.exports = {
   ],
   'testPathIgnorePatterns': [
     '/node_modules/',
-    'components',
   ],
   'collectCoverageFrom': [
     'src/**/*.{js,jsx,ts}',
