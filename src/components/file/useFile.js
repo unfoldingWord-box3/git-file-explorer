@@ -1,6 +1,6 @@
 import React, {
   useState, useCallback, useContext,
-  useEffect,
+  useEffect, useMemo
 } from 'react';
 import PropTypes from 'prop-types';
 import useDeepCompareEffect from 'use-deep-compare-effect';
@@ -22,9 +22,12 @@ function useFile({
   config: _config,
   create=false,
   onOpenValidation,
+  onConfirmClose,
 }) {
   const [file, setFile] = useState();
+  const [isChanged, setIsChanged] = useState(false);
   const [blob, setBlob] = useState();
+
   const { actions: { updateBranch }, config: repositoryConfig } = useContext(RepositoryContext);
 
   const config = _config || repositoryConfig;
@@ -32,10 +35,21 @@ function useFile({
 
   const [deleted, setDeleted] = useState();
 
+  const _setBlob = useCallback((blob) => {
+    if (blob && isChanged && onConfirmClose) {
+      if (onConfirmClose())
+      {
+        setBlob(blob);
+      }
+    } else{
+      setBlob(blob);
+    }
+  },[isChanged, blob, file, setBlob, onConfirmClose]);
+
   const {
     state: blobState, actions: blobActions, components: blobComponents,
   } = useBlob({
-    blob, onBlob: setBlob, config, repository, filepath,
+    blob, onBlob: _setBlob, config, repository, filepath,
   });
 
   const { push: writeable } = (repository && repository.permissions) ? repository.permissions : {};
@@ -43,6 +57,10 @@ function useFile({
   const update = useCallback((_file) => {
     setFile(_file);
   }, []);
+
+  useEffect(() => {
+    setIsChanged(false);
+  }, [file, deleted, closed]);
 
   const read = useCallback(async (_filepath) => {
     if (onFilepath) {
@@ -102,8 +120,9 @@ function useFile({
   const save = useCallback(async (content) => {
     await saveFile({
       authentication, repository, branch, file, content,
+    }).then(() => {
+      load();
     });
-    await load();
   }, [writeable, authentication, repository, branch, file, load]);
 
   const dangerouslyDelete = useCallback(async () => {
@@ -153,6 +172,8 @@ function useFile({
     save,
     close,
     dangerouslyDelete,
+    setIsChanged,
+    onConfirmClose,
   };
 
   const components = {
@@ -187,6 +208,7 @@ function useFile({
 
   return {
     state: file,
+    stateValues: {isChanged},
     actions,
     component,
     components,

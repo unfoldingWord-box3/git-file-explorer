@@ -19,21 +19,23 @@ export function FileContextProvider({
   create,
   onOpenValidation,
   children,
+  onConfirmClose,
 }) {
   const { state: contextAuthentication } = useContext(AuthenticationContext);
   const { state: contextRepository, config: contextConfig } = useContext(RepositoryContext);
 
   const {
-    state, actions, component, components, config,
+    state, stateValues, actions, component, components, config,
   } = useFile({
     config: _config || contextConfig,
     authentication: _authentication || contextAuthentication,
     repository: _repository || contextRepository,
-    filepath, onFilepath, defaultContent, create, onOpenValidation,
+    filepath, onFilepath, defaultContent, create, onOpenValidation, onConfirmClose,
   });
 
   const context = {
     state,
+    stateValues,
     actions,
     component,
     components,
